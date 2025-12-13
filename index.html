@@ -1,0 +1,124 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark" data-theme="dark-blue">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nano Banana - Workflow Builder</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "var(--color-primary)",
+              "app-bg": "var(--color-app-bg)",
+              "panel-bg": "var(--color-panel-bg)",
+              "border-app": "var(--color-border)",
+              "text-main": "var(--color-text-main)",
+              "text-muted": "var(--color-text-muted)",
+              "highlight": "var(--color-highlight)",
+            },
+            fontFamily: {
+              "display": ["Space Grotesk", "Noto Sans Arabic", "sans-serif"],
+              "body": ["Noto Sans Arabic", "sans-serif"],
+            },
+            borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+          },
+        },
+      }
+    </script>
+    <style>
+      :root {
+        /* Default: Dark Blue */
+        --color-primary: #137fec;
+        --color-app-bg: #09090b;
+        --color-panel-bg: #18181b;
+        --color-border: #27272a;
+        --color-text-main: #ffffff;
+        --color-text-muted: #94a3b8;
+        --color-highlight: rgba(255, 255, 255, 0.1);
+      }
+
+      [data-theme="white-apple"] {
+        --color-primary: #007aff;
+        --color-app-bg: #f5f5f7;
+        --color-panel-bg: #ffffff;
+        --color-border: #e5e5e5;
+        --color-text-main: #1d1d1f;
+        --color-text-muted: #86868b;
+        --color-highlight: rgba(0, 0, 0, 0.05);
+      }
+
+      [data-theme="orange"] {
+        --color-primary: #f97316; /* Orange-500 */
+        --color-app-bg: #1c1917; /* Stone-900 */
+        --color-panel-bg: #292524; /* Stone-800 */
+        --color-border: #44403c; /* Stone-700 */
+        --color-text-main: #fafaf9;
+        --color-text-muted: #a8a29e;
+        --color-highlight: rgba(249, 115, 22, 0.1);
+      }
+
+      body {
+        font-family: "Noto Sans Arabic", "Space Grotesk", sans-serif;
+        background-color: var(--color-app-bg);
+        color: var(--color-text-main);
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      .font-display {
+        font-family: "Space Grotesk", "Noto Sans Arabic", sans-serif;
+      }
+      .dot-grid {
+        background-image: radial-gradient(var(--color-text-muted) 1px, transparent 1px);
+        background-size: 24px 24px;
+        opacity: 0.2;
+      }
+      
+      /* Smooth transitions for theme switching */
+      .theme-transition, .theme-transition * {
+        transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--color-border);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--color-text-muted);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
+  }
+}
+</script>
+</head>
+  <body class="overflow-hidden h-screen theme-transition">
+    <div id="root" class="h-full flex flex-col"></div>
+  </body>
+</html>
