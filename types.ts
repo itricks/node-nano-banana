@@ -1,5 +1,4 @@
 
-
 export type Language = 'ar' | 'en';
 export type Theme = 'dark-blue' | 'white-apple' | 'orange';
 
@@ -12,6 +11,7 @@ export interface Translations {
   close: string;
   run: string;
   generating: string;
+  thinking: string;
   zoomIn: string;
   zoomOut: string;
   fitView: string;
@@ -34,6 +34,8 @@ export interface Translations {
   saved: string;
   modelStandard: string;
   modelPro: string;
+  chatModelStandard: string;
+  chatModelPro: string;
   ratioSquare: string;
   ratioLandscape: string;
   ratioPortrait: string;
@@ -48,18 +50,24 @@ export interface Translations {
   linkedToImage: string;
   retry: string;
   regenerate: string;
+  selectMode: string;
+  selectionCount: string;
+  modeImage: string;
+  modeChat: string;
+  copyText: string;
 }
 
 export const translations: Record<Language, Translations> = {
   ar: {
     appName: "Nano Banana",
-    writePrompt: "اكتب وصف الصورة هنا... (أو الصق صورة Ctrl+V)",
+    writePrompt: "اكتب هنا... (للرسم أو المحادثة)",
     settings: "الإعدادات",
     apiKey: "مفتاح API",
     apiKeyDesc: "أدخل مفتاح Gemini API الخاص بك لتشغيل النموذج",
     close: "إغلاق",
-    run: "تشغيل",
+    run: "إرسال",
     generating: "جاري التلوين...",
+    thinking: "جاري الكتابة...",
     zoomIn: "تكبير",
     zoomOut: "تصغير",
     fitView: "ملاءمة العرض",
@@ -73,15 +81,17 @@ export const translations: Record<Language, Translations> = {
     quality: "الجودة",
     errorMissingKey: "مفقود API Key",
     errorInvalidKey: "مفتاح API غير صالح",
-    errorPermissionDenied: "تم رفض الإذن. تحقق من: 1. قيود المفتاح (Restrictions). 2. تفعيل Generative Language API. 3. هذا الموديل يتطلب حساب Google Cloud مربوط ببطاقة دفع (Paid Billing).",
-    errorGeneric: "حدث خطأ أثناء التوليد",
-    errorQuotaExceeded: "تم تجاوز الحصة (429). يرجى الانتظار قليلاً أو تقليل عدد الصور.",
+    errorPermissionDenied: "تم رفض الإذن. تحقق من القيود أو تفعيل API.",
+    errorGeneric: "حدث خطأ",
+    errorQuotaExceeded: "تم تجاوز الحصة (429).",
     images: "صور",
     delete: "حذف",
     apply: "تطبيق",
     saved: "تم الحفظ",
     modelStandard: "نانو بنانا (سريع)",
     modelPro: "نانو بنانا برو 2 (جودة عالية)",
+    chatModelStandard: "جيمناي 2.5 فلاش",
+    chatModelPro: "جيمناي 3 برو",
     ratioSquare: "مربع (1:1)",
     ratioLandscape: "أفقي (4:3)",
     ratioPortrait: "عمودي (3:4)",
@@ -96,16 +106,22 @@ export const translations: Record<Language, Translations> = {
     linkedToImage: "مرتبط بالصورة السابقة",
     retry: "إعادة المحاولة",
     regenerate: "توليد مرة أخرى",
+    selectMode: "وضع التحديد",
+    selectionCount: "عناصر محددة",
+    modeImage: "رسم",
+    modeChat: "محادثة",
+    copyText: "نسخ النص",
   },
   en: {
     appName: "Nano Banana",
-    writePrompt: "Describe image here... (or Paste image Ctrl+V)",
+    writePrompt: "Write here... (Generate or Chat)",
     settings: "Settings",
     apiKey: "API Key",
     apiKeyDesc: "Enter your Gemini API Key to enable generation",
     close: "Close",
-    run: "Run",
+    run: "Send",
     generating: "Painting...",
+    thinking: "Thinking...",
     zoomIn: "Zoom In",
     zoomOut: "Zoom Out",
     fitView: "Fit View",
@@ -119,15 +135,17 @@ export const translations: Record<Language, Translations> = {
     quality: "Quality",
     errorMissingKey: "Missing API Key",
     errorInvalidKey: "Invalid API Key",
-    errorPermissionDenied: "Permission Denied. Check: 1. Key Restrictions (Referrer/IP). 2. API Enabled. 3. This model requires a Paid Billing Account.",
-    errorGeneric: "Error generating image",
-    errorQuotaExceeded: "Quota Exceeded (429). Please wait or reduce image count.",
+    errorPermissionDenied: "Permission Denied. Check API restrictions.",
+    errorGeneric: "Error generating",
+    errorQuotaExceeded: "Quota Exceeded (429).",
     images: "images",
     delete: "Delete",
     apply: "Apply",
     saved: "Saved",
     modelStandard: "Nano Banana (Fast)",
     modelPro: "Nano Banana Pro 2 (High Quality)",
+    chatModelStandard: "Gemini 2.5 Flash",
+    chatModelPro: "Gemini 3 Pro",
     ratioSquare: "Square (1:1)",
     ratioLandscape: "Landscape (4:3)",
     ratioPortrait: "Portrait (3:4)",
@@ -142,5 +160,10 @@ export const translations: Record<Language, Translations> = {
     linkedToImage: "Linked to previous image",
     retry: "Retry",
     regenerate: "Regenerate",
+    selectMode: "Select Mode",
+    selectionCount: "selected items",
+    modeImage: "Image",
+    modeChat: "Chat",
+    copyText: "Copy Text",
   }
 };

@@ -30,7 +30,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-app-bg text-text-main overflow-hidden font-display selection:bg-primary/30 selection:text-white">
+    <div className="flex flex-col h-full bg-app-bg text-text-main overflow-hidden font-display selection:bg-blue-600 selection:text-white">
       <Canvas 
         t={t} 
         lang={lang} 
