@@ -55,6 +55,15 @@ export interface Translations {
   modeImage: string;
   modeChat: string;
   copyText: string;
+  discover: string;
+  discovering: string;
+  organize: string;
+  createNode: string;
+  createImageStandard: string;
+  createImagePro: string;
+  createChatStandard: string;
+  createChatPro: string;
+  quickPromptPlaceholder: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -111,6 +120,15 @@ export const translations: Record<Language, Translations> = {
     modeImage: "رسم",
     modeChat: "محادثة",
     copyText: "نسخ النص",
+    discover: "اكتشف الجديد",
+    discovering: "جاري البحث...",
+    organize: "تنظيم",
+    createNode: "إنشاء عقدة جديدة",
+    createImageStandard: "صورة (نانو بنانا)",
+    createImagePro: "صورة (برو)",
+    createChatStandard: "محادثة (فلاش)",
+    createChatPro: "محادثة (برو)",
+    quickPromptPlaceholder: "ماذا تريد أن تصنع؟ اضغط Enter...",
   },
   en: {
     appName: "Nano Banana",
@@ -165,5 +183,14 @@ export const translations: Record<Language, Translations> = {
     modeImage: "Image",
     modeChat: "Chat",
     copyText: "Copy Text",
+    discover: "Discover New",
+    discovering: "Searching...",
+    organize: "Organize",
+    createNode: "Create New Node",
+    createImageStandard: "Image (Nano Banana)",
+    createImagePro: "Image (Pro)",
+    createChatStandard: "Chat (Flash)",
+    createChatPro: "Chat (Pro)",
+    quickPromptPlaceholder: "What do you want to create? Press Enter...",
   }
 };

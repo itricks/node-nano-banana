@@ -48,6 +48,26 @@ const ASPECT_RATIOS = [
 
 type AppMode = 'image' | 'chat';
 
+// Accounts to discover from
+const DISCOVER_ACCOUNTS = [
+    "@levelsio", "@MKBHD", "@elder_plinius", "@Arminn_Ai", "@heyshrutimishra", "@iamfakhrealam", "@EyeingAI", 
+    "@tyler_agg", "@techhalla", "@EHuanglu", "@antinertia", "@JesusPlazaX", "@Ror_Fly", "@freepik", 
+    "@ninjaaitips", "@DAIEvolutionHub", "@suhrabautomates", "@promptprincess", "@D_studioproject", "@googleturkiye", 
+    "@NanoBanana_labs", "@PavolRusnak", "@beginnersblog1", "@YaseenK7212", "@lexx_aura", "@Zar_xplorer", 
+    "@ZaraIrahh", "@gizakdag", "@NanoBanana", "@oggii_0", "@Just_sharon7", "@ttmouse", "@Strength04_X", 
+    "@Taaruk_", "@xmliisu", "@godofprompt", "@xIrissy", "@GirlsinAIArt", "@AiAlpha49697", "@CallMeDiegoJr", 
+    "@dr_cintas", "@venturetwins", "@MartinssonFM", "@archi_reum", "@NEXUS_TO_NOVA", "@Kerroudjm", 
+    "@firatbilal", "@LinusEkenstam", "@LudovicCreator", "@rovvmut_", "@beechinour", "@BenjaminUIX", 
+    "@ai_artworkgen", "@guishou_56", "@MaransCrypto", "@zohanlin", "@meowkoteeq", "@codewithimanshu", 
+    "@vadooai", "@fofrAI", "@gaucheai", "@askjuneai", "@technoholic_me", "@DilshadAI1", "@GlbGPT", 
+    "@BasedLabsAI", "@KaitoAI", "@atomu_ai", "@michaelaubry", "@AndyAI_", "@HiggsfieldAI", "@TopazLabs", 
+    "@LeonardoAi", "@runwayml", "@krea_ai", "@bfl_ml", "@hedra_labs", "@WaveFormsAI", "@ViggleAI", 
+    "@IdeogramAI", "@FlorafaunaAI", "@WavespeedAI", "@PikaLabs", "@OHUM_AI", "@LOOKSWISE_AI", "@v0", 
+    "@ReveimageAI", "@WanAI", "@ViduAI", "@OpenartAI", "@LTXAI", "@AdobeFirefly", "@WeavyAI", "@HailuoAI", 
+    "@MinimaxAI", "@SeedanceAI", "@KlingAI", "@VeoAI", "@SoraAI", "@GlbGPT", "@PhotoAI", "@PromptBase", 
+    "@MoralisIO", "@ElevenLabsIO"
+];
+
 export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme, onSetTheme }) => {
   // -- State --
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -56,7 +76,27 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userApiKey, setUserApiKey] = useState("");
   const [isKeySaved, setIsKeySaved] = useState(false);
+  const [isDiscovering, setIsDiscovering] = useState(false);
   
+  // -- Linking State (Drag Wire) --
+  const [activeConnection, setActiveConnection] = useState<{
+    startNodeId: string;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+
+  // -- Context Menu & Quick Create State --
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sourceNodeId: string } | null>(null);
+  const [quickCreate, setQuickCreate] = useState<{ 
+    x: number; 
+    y: number; 
+    sourceNodeId: string; 
+    type: 'image' | 'text'; 
+    modelType: 'standard' | 'pro' 
+  } | null>(null);
+
   // App Mode (Image vs Chat)
   const [activeMode, setActiveMode] = useState<AppMode>('image');
 
@@ -67,7 +107,7 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
   // Generation Options
   const [selectedCount, setSelectedCount] = useState(1);
   const [selectedQuality, setSelectedQuality] = useState('1K');
-  const [selectedModel, setSelectedModel] = useState<'standard' | 'pro'>('pro'); // Shared state, logic changes based on mode
+  const [selectedModel, setSelectedModel] = useState<'standard' | 'pro'>('pro'); 
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('9:16');
   const [isRatioMenuOpen, setIsRatioMenuOpen] = useState(false);
 
@@ -87,6 +127,7 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const quickPromptInputRef = useRef<HTMLInputElement>(null);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const initialPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const initialNodePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -106,6 +147,13 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
     });
     return [...attachedImages, ...fromNodes];
   };
+
+  // Focus quick prompt input when it opens
+  useEffect(() => {
+    if (quickCreate && quickPromptInputRef.current) {
+        quickPromptInputRef.current.focus();
+    }
+  }, [quickCreate]);
 
   // -- File Handling Helpers --
   const processFiles = async (files: File[]) => {
@@ -215,6 +263,183 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // -- Wire Linking Handlers --
+  const handleStartConnection = (nodeId: string, clientX: number, clientY: number, nodeWidth: number, nodeHeight: number) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    // Start coordinates are exactly at the right handle center
+    // Visual handle offset is -right-3 (approx 12px)
+    // We use Canvas Coordinates here
+    const startX = node.x + nodeWidth + 12; 
+    const startY = node.y + nodeHeight / 2;
+    
+    // We also need the current mouse position in canvas coords to start the drag smoothly
+    const rect = containerRef.current?.getBoundingClientRect();
+    let initialCurrentX = startX;
+    let initialCurrentY = startY;
+
+    if (rect) {
+        initialCurrentX = (clientX - rect.left - pan.x) / scale;
+        initialCurrentY = (clientY - rect.top - pan.y) / scale;
+    }
+
+    setActiveConnection({
+      startNodeId: nodeId,
+      startX: startX,
+      startY: startY,
+      currentX: initialCurrentX, 
+      currentY: initialCurrentY
+    });
+    
+    // Clear any existing menus
+    setContextMenu(null);
+    setQuickCreate(null);
+  };
+
+  const handleCompleteConnection = (targetNodeId: string) => {
+    if (!activeConnection) return;
+    if (activeConnection.startNodeId === targetNodeId) {
+        setActiveConnection(null);
+        return;
+    }
+
+    // Connect source to target
+    setNodes(prev => prev.map(n => {
+        if (n.id === targetNodeId) {
+            const currentParents = n.parentIds || (n.parentId ? [n.parentId] : []);
+            // Avoid duplicates
+            if (currentParents.includes(activeConnection.startNodeId)) return n;
+            return {
+                ...n,
+                parentIds: [...currentParents, activeConnection.startNodeId]
+            };
+        }
+        return n;
+    }));
+    
+    setActiveConnection(null);
+  };
+
+  const handleDropConnectionOnVoid = (x: number, y: number) => {
+      if (!activeConnection) return;
+      
+      // Open Context Menu at drop location
+      setContextMenu({
+          x,
+          y,
+          sourceNodeId: activeConnection.startNodeId
+      });
+      
+      setActiveConnection(null);
+  };
+
+  const handleContextMenuSelect = (type: 'image' | 'text', modelType: 'standard' | 'pro') => {
+      if (!contextMenu) return;
+      
+      setQuickCreate({
+          x: contextMenu.x,
+          y: contextMenu.y,
+          sourceNodeId: contextMenu.sourceNodeId,
+          type,
+          modelType
+      });
+      setContextMenu(null);
+  };
+
+  const handleQuickCreateSubmit = (promptText: string) => {
+      if (!quickCreate || !promptText.trim()) {
+          setQuickCreate(null);
+          return;
+      }
+
+      const { x, y, sourceNodeId, type, modelType } = quickCreate;
+      const newNodeId = `${type}-${Date.now()}`;
+      
+      const sourceNode = nodes.find(n => n.id === sourceNodeId);
+      const inputImages = sourceNode?.imageData 
+          ? [{ data: sourceNode.imageData, mimeType: 'image/png' }] 
+          : [];
+
+      // If source is a prompt node and has input images, carry them over? 
+      // Simplified: Just take previous output if available.
+
+      const newNode: Node = {
+          id: newNodeId,
+          type,
+          x,
+          y,
+          status: 'loading',
+          parentIds: [sourceNodeId],
+          parentId: sourceNodeId,
+          modelType,
+          content: type === 'text' ? '' : undefined, // For text nodes, content stores output
+          quality: selectedQuality,
+          aspectRatio: selectedAspectRatio
+      };
+
+      setNodes(prev => [...prev, newNode]);
+      setQuickCreate(null);
+
+      // Trigger Generation
+      if (type === 'image') {
+          // We treat the promptText as the user prompt for this specific node generation
+          // But our generateImage function usually takes prompt from a parent "Prompt Node".
+          // To support this inline flow, we pass promptText directly.
+          generateImage(promptText, inputImages, newNodeId, selectedQuality, modelType, selectedAspectRatio);
+      } else {
+          generateText(promptText, inputImages, newNodeId, modelType);
+      }
+  };
+
+
+  const handleDiscover = async () => {
+     try {
+         const key = userApiKey || process.env.API_KEY;
+         if (!key) {
+             setIsSettingsOpen(true);
+             return;
+         }
+
+         setIsDiscovering(true);
+         const shuffled = [...DISCOVER_ACCOUNTS].sort(() => 0.5 - Math.random());
+         const selectedAccounts = shuffled.slice(0, 7);
+         
+         const ai = new GoogleGenAI({ apiKey: key });
+         const searchQuery = `
+            Search for recent posts from these X (Twitter) accounts: ${selectedAccounts.join(', ')}.
+            Find a single, creative, and high-quality "AI art prompt" or "image generation prompt" shared recently.
+            
+            CRITICAL OUTPUT RULES:
+            1. Return ONLY the raw prompt text suitable for an image generator (like Midjourney, Gemini, etc).
+            2. Do NOT include hashtags like #AIArt.
+            3. Do NOT include the username or introductory text like "Here is a prompt:".
+            4. If the prompt is for a video, extract the description of the video.
+            5. It should be a descriptive, English text.
+         `;
+         
+         const response = await ai.models.generateContent({
+             model: 'gemini-2.5-flash', 
+             contents: searchQuery,
+             config: { tools: [{ googleSearch: {} }] }
+         });
+
+         const extractedPrompt = response.text?.trim();
+         
+         if (extractedPrompt) {
+             setPrompt(extractedPrompt);
+         } else {
+             setPrompt("A futuristic city floating in the clouds, cyberpunk style, neon lights, 8k resolution.");
+         }
+
+     } catch (e) {
+         console.error("Discover failed", e);
+         alert(t.errorGeneric);
+     } finally {
+         setIsDiscovering(false);
+     }
   };
 
   // -- Logic: Image Generation --
@@ -575,6 +800,69 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
       handleSubmit();
     }
   };
+  
+  // -- Organize Functionality --
+  const handleOrganize = () => {
+    if (nodes.length === 0) return;
+
+    const gap = 60;
+    const cols = Math.ceil(Math.sqrt(nodes.length)); 
+    let currentX = 0;
+    let currentY = 0;
+    let maxHeightInRow = 0;
+    
+    // Sort nodes to group similar types together slightly (prompts first, then others)
+    const sortedNodes = [...nodes].sort((a, b) => {
+        if (a.type === b.type) return 0;
+        if (a.type === 'prompt') return -1;
+        return 1;
+    });
+
+    const newNodes = sortedNodes.map((node, i) => {
+        const w = node.type === 'prompt' ? 450 : (node.type === 'text' ? 500 : 384);
+        const h = node.type === 'prompt' ? (node.inputImages?.length ? 250 : 200) : (node.type === 'text' ? 300 : 384); 
+        
+        if (i > 0 && i % cols === 0) {
+            currentX = 0;
+            currentY += maxHeightInRow + gap;
+            maxHeightInRow = 0;
+        }
+        
+        const newNode = { ...node, x: currentX, y: currentY };
+        
+        currentX += w + gap;
+        maxHeightInRow = Math.max(maxHeightInRow, h);
+        
+        return newNode;
+    });
+
+    setNodes(newNodes);
+
+    // Auto Zoom to Fit Content
+    setTimeout(() => {
+       const minX = Math.min(...newNodes.map(n => n.x));
+       const maxX = Math.max(...newNodes.map(n => n.x + (n.type === 'prompt' ? 450 : 384)));
+       const minY = Math.min(...newNodes.map(n => n.y));
+       const maxY = Math.max(...newNodes.map(n => n.y + 384));
+       
+       const contentW = maxX - minX + 200; // + padding
+       const contentH = maxY - minY + 200;
+       
+       const scaleX = window.innerWidth / contentW;
+       const scaleY = window.innerHeight / contentH;
+       const newScale = Math.min(Math.min(scaleX, scaleY) * 0.9, 1); 
+       
+       const centerX = (minX + maxX) / 2;
+       const centerY = (minY + maxY) / 2;
+       
+       // Center content on screen
+       const newPanX = -centerX * newScale + window.innerWidth / 2;
+       const newPanY = -centerY * newScale + window.innerHeight / 2;
+       
+       setPan({ x: newPanX, y: newPanY });
+       setScale(newScale);
+    }, 50);
+  };
 
   // -- Event Listeners (Scroll/Drag) --
   useEffect(() => {
@@ -587,20 +875,41 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
       if (scrollable && !e.ctrlKey && !e.metaKey) return;
 
       e.preventDefault();
+      
+      // Smart Zoom Logic: Zoom towards the mouse cursor
       if (e.ctrlKey || e.metaKey) {
-        const zoomSensitivity = 0.002;
-        setScale(s => Math.min(Math.max(0.2, s - e.deltaY * zoomSensitivity), 3));
+        // Reduced sensitivity for smoother, more gradual zoom proportions
+        const zoomSensitivity = 0.0006; 
+        const delta = -e.deltaY * zoomSensitivity;
+        const newScale = Math.min(Math.max(0.1, scale + delta), 4);
+        
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Calculate the world coordinates of the mouse before zoom
+        const worldX = (mouseX - pan.x) / scale;
+        const worldY = (mouseY - pan.y) / scale;
+        
+        // Calculate new pan such that the world coordinates remain under the mouse
+        const newPanX = mouseX - worldX * newScale;
+        const newPanY = mouseY - worldY * newScale;
+
+        setScale(newScale);
+        setPan({ x: newPanX, y: newPanY });
       } else {
         setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
       }
     };
+    
     container.addEventListener('wheel', onWheel, { passive: false });
     return () => container.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [scale, pan]);
 
   const handlePointerDown = (e: React.PointerEvent, nodeId?: string) => {
     const target = e.target as HTMLElement;
-    if (['TEXTAREA', 'INPUT', 'BUTTON'].includes(target.tagName)) return;
+    // Don't drag if clicking buttons or inputs, OR if clicking a handle (handled separately)
+    if (['TEXTAREA', 'INPUT', 'BUTTON'].includes(target.tagName) || target.closest('button')) return;
 
     if (nodeId) {
        e.stopPropagation();
@@ -623,12 +932,28 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
       initialPanRef.current = { ...pan };
       dragStartRef.current = { x: e.clientX, y: e.clientY };
       (e.target as Element).setPointerCapture(e.pointerId);
+      
+      // Close menus if clicking on canvas
+      setContextMenu(null);
+      setQuickCreate(null);
     }
   };
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
+    
+    if (activeConnection) {
+        // Update the current point of the wire being dragged
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+            const relX = (e.clientX - rect.left - pan.x) / scale;
+            const relY = (e.clientY - rect.top - pan.y) / scale;
+            setActiveConnection(prev => prev ? ({ ...prev, currentX: relX, currentY: relY }) : null);
+        }
+        return;
+    }
+
     if (draggedNodeId) {
       setNodes((prev) => prev.map((n) => {
         if (n.id === draggedNodeId) {
@@ -643,13 +968,28 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
     } else if (isDraggingCanvas) {
       setPan({ x: initialPanRef.current.x + dx, y: initialPanRef.current.y + dy });
     }
-  }, [draggedNodeId, isDraggingCanvas, scale]);
+  }, [draggedNodeId, isDraggingCanvas, scale, activeConnection, pan]);
 
   const handlePointerUp = useCallback((e: PointerEvent) => {
     setDraggedNodeId(null);
     setIsDraggingCanvas(false);
+    
+    // If event was handled by a node (connection completed), don't show void menu
+    if (e.defaultPrevented) return;
+
+    // Check if we dropped a connection in the void
+    if (activeConnection) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+           const dropX = (e.clientX - rect.left - pan.x) / scale;
+           const dropY = (e.clientY - rect.top - pan.y) / scale;
+           setContextMenu({ x: dropX, y: dropY, sourceNodeId: activeConnection.startNodeId });
+           setActiveConnection(null);
+        }
+    }
+
     try { (e.target as Element).releasePointerCapture(e.pointerId); } catch(err) {}
-  }, []);
+  }, [activeConnection, pan, scale]); // activeConnection is crucial here
 
   useEffect(() => {
     window.addEventListener('pointermove', handlePointerMove);
@@ -661,8 +1001,9 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
   }, [handlePointerMove, handlePointerUp]);
 
   // -- Canvas Controls --
-  const zoomIn = () => setScale(s => Math.min(s + 0.1, 3));
-  const zoomOut = () => setScale(s => Math.max(s - 0.1, 0.2));
+  // Gradual zoom increments for better proportions and smoothness
+  const zoomIn = () => setScale(s => Math.min(s + 0.05, 4));
+  const zoomOut = () => setScale(s => Math.max(s - 0.05, 0.1));
   const fitView = () => { setPan({ x: 0, y: 0 }); setScale(1); };
   const clearCanvas = () => { setNodes([]); setSelectedNodeIds(new Set()); };
   const toggleCount = () => {
@@ -713,6 +1054,7 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
             <div className="h-px w-full bg-border-app my-0.5"></div>
             <ToolbarBtn icon="add" onClick={zoomIn} title={t.zoomIn} />
             <ToolbarBtn icon="remove" onClick={zoomOut} title={t.zoomOut} />
+            <ToolbarBtn icon="grid_view" onClick={handleOrganize} title={t.organize} />
             <div className="h-px w-full bg-border-app my-0.5"></div>
             <ToolbarBtn icon="center_focus_strong" onClick={fitView} title={t.fitView} />
             <ToolbarBtn icon="delete_sweep" onClick={clearCanvas} title={t.clearCanvas} />
@@ -764,8 +1106,18 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
               <button onClick={() => fileInputRef.current?.click()} className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-highlight text-text-muted hover:text-text-main transition" title={t.attachImage}>
                 <Icon name="attach_file" className="rotate-45" />
               </button>
+              
+              {/* Discover Button */}
+              <button 
+                onClick={handleDiscover}
+                disabled={isDiscovering}
+                className={`size-10 shrink-0 rounded-xl flex items-center justify-center bg-highlight text-text-muted hover:text-text-main transition ${isDiscovering ? 'animate-pulse cursor-wait' : ''}`}
+                title={isDiscovering ? t.discovering : t.discover}
+              >
+                <Icon name={isDiscovering ? "travel_explore" : "explore"} className={isDiscovering ? "animate-spin" : ""} />
+              </button>
 
-              <textarea ref={textareaRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={handleKeyDown} onPaste={handlePaste} onPointerDown={(e) => e.stopPropagation()} dir={lang === 'ar' ? 'rtl' : 'ltr'} placeholder={t.writePrompt} className="w-full bg-transparent border-none text-text-main placeholder-text-muted focus:ring-0 resize-none h-12 max-h-32 py-2 custom-scrollbar select-text cursor-text selection:bg-blue-500 selection:text-white" style={{ minHeight: '48px' }} />
+              <textarea ref={textareaRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={handleKeyDown} onPaste={handlePaste} onPointerDown={(e) => e.stopPropagation()} dir={lang === 'ar' ? 'rtl' : 'ltr'} placeholder={isDiscovering ? t.discovering : t.writePrompt} className="w-full bg-transparent border-none text-text-main placeholder-text-muted focus:ring-0 resize-none h-12 max-h-32 py-2 custom-scrollbar select-text cursor-text selection:bg-blue-500 selection:text-white" style={{ minHeight: '48px' }} />
               
               <button onClick={handleSubmit} disabled={!prompt.trim() && effectiveImages.length === 0} className={`size-10 shrink-0 rounded-xl flex items-center justify-center transition ${(!prompt.trim() && effectiveImages.length === 0) ? 'bg-highlight text-text-muted cursor-not-allowed' : 'bg-primary text-white shadow-lg shadow-primary/20'}`}>
                 <Icon name="arrow_upward" />
@@ -840,7 +1192,7 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
         </div>
       </div>
 
-      {/* Settings Modal (Simplified for brevity, same logic applies) */}
+      {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onPointerDown={e => e.stopPropagation()}>
            <div className="bg-panel-bg border border-border-app w-full max-w-md rounded-2xl shadow-2xl p-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
@@ -899,7 +1251,78 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
 
       {/* Nodes Layer */}
       <div className="absolute top-0 left-0 w-full h-full origin-top-left will-change-transform" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}>
+        
+        {/* Context Menu for Node Creation */}
+        {contextMenu && (
+            <div 
+                className="absolute z-50 bg-panel-bg border border-border-app rounded-xl shadow-2xl p-2 flex flex-col gap-1 w-56 animate-in fade-in zoom-in-95 duration-100" 
+                style={{ top: contextMenu.y, left: contextMenu.x }}
+                onPointerDown={(e) => e.stopPropagation()}
+            >
+                <div className="px-2 py-1 text-xs font-bold text-text-muted uppercase tracking-wider mb-1">{t.createNode}</div>
+                <button onClick={() => handleContextMenuSelect('image', 'standard')} className="flex items-center gap-3 p-2 rounded-lg hover:bg-highlight text-text-main text-sm font-medium transition text-start">
+                    <Icon name="flash_on" className="text-yellow-500 text-lg" />
+                    <span>{t.createImageStandard}</span>
+                </button>
+                <button onClick={() => handleContextMenuSelect('image', 'pro')} className="flex items-center gap-3 p-2 rounded-lg hover:bg-highlight text-text-main text-sm font-medium transition text-start">
+                    <Icon name="auto_awesome" className="text-cyan-400 text-lg" />
+                    <span>{t.createImagePro}</span>
+                </button>
+                <div className="h-px bg-border-app my-1"></div>
+                <button onClick={() => handleContextMenuSelect('text', 'standard')} className="flex items-center gap-3 p-2 rounded-lg hover:bg-highlight text-text-main text-sm font-medium transition text-start">
+                    <Icon name="bolt" className="text-amber-500 text-lg" />
+                    <span>{t.createChatStandard}</span>
+                </button>
+                <button onClick={() => handleContextMenuSelect('text', 'pro')} className="flex items-center gap-3 p-2 rounded-lg hover:bg-highlight text-text-main text-sm font-medium transition text-start">
+                    <Icon name="psychology" className="text-indigo-400 text-lg" />
+                    <span>{t.createChatPro}</span>
+                </button>
+            </div>
+        )}
+
+        {/* Quick Create Prompt Input */}
+        {quickCreate && (
+            <div 
+                className="absolute z-50 bg-panel-bg border border-primary ring-2 ring-primary/20 rounded-xl shadow-2xl p-1 w-80 animate-in fade-in zoom-in-95 duration-100 flex gap-2" 
+                style={{ top: quickCreate.y, left: quickCreate.x }}
+                onPointerDown={(e) => e.stopPropagation()}
+            >
+                <input 
+                    ref={quickPromptInputRef}
+                    type="text" 
+                    placeholder={t.quickPromptPlaceholder}
+                    className="w-full bg-transparent border-none text-text-main placeholder-text-muted focus:ring-0 text-sm p-2"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            handleQuickCreateSubmit((e.target as HTMLInputElement).value);
+                        } else if (e.key === 'Escape') {
+                            setQuickCreate(null);
+                        }
+                    }}
+                />
+                <button 
+                    onClick={() => { if(quickPromptInputRef.current) handleQuickCreateSubmit(quickPromptInputRef.current.value); }}
+                    className="bg-primary text-white p-2 rounded-lg hover:bg-primary/90 transition"
+                >
+                    <Icon name="arrow_upward" className="text-sm" />
+                </button>
+            </div>
+        )}
+
         <svg className="absolute overflow-visible pointer-events-none z-0">
+          {/* Active Connection Line being dragged */}
+          {activeConnection && (
+            <path 
+                d={`M ${activeConnection.startX} ${activeConnection.startY} C ${activeConnection.startX + 100} ${activeConnection.startY}, ${activeConnection.currentX - 100} ${activeConnection.currentY}, ${activeConnection.currentX} ${activeConnection.currentY}`}
+                fill="none"
+                stroke={theme === 'white-apple' ? '#3b82f6' : '#facc15'} // Blue or Yellow depending on theme
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray="5,5"
+                className="animate-pulse"
+            />
+          )}
+
           {nodes.map(node => {
             const parentIds = node.parentIds || (node.parentId ? [node.parentId] : []);
             if (parentIds.length === 0) return null;
@@ -910,30 +1333,33 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
                
                let startX, startY, endX, endY;
 
-               // Calculate connections based on node types
-               if (parent.type === 'image' && node.type === 'prompt') {
-                  startX = parent.x + 192; 
-                  startY = parent.y + 384; 
-                  endX = node.x + 225; 
-                  endY = node.y;
-               } else if (parent.type === 'prompt' && node.type === 'text') {
-                  startX = parent.x + 225;
-                  startY = parent.y + (parent.inputImages?.length ? 250 : 120);
-                  endX = node.x + 225;
-                  endY = node.y;
-               } else if (parent.type === 'text' && node.type === 'prompt') {
-                  startX = parent.x + 225;
-                  startY = parent.y + 300; // Approx height of text node
-                  endX = node.x + 225;
-                  endY = node.y;
-               } else {
-                  // Prompt -> Image
-                  startX = parent.x + 225; 
-                  const hasImages = parent.inputImages && parent.inputImages.length > 0;
-                  const promptHeight = hasImages ? 250 : 120;
-                  startY = parent.y + promptHeight; 
-                  endX = node.x + 192; 
-                  endY = node.y;
+               // Determine Node Dimensions based on type
+               const parentW = parent.type === 'prompt' ? 450 : (parent.type === 'text' ? 500 : 384);
+               const parentH = parent.type === 'prompt' ? (parent.inputImages?.length ? 250 : 120) : (parent.type === 'text' ? 100 : 384);
+               const nodeW = node.type === 'prompt' ? 450 : (node.type === 'text' ? 500 : 384);
+               // const nodeH = node.type === 'prompt' ? 200 : 384; 
+
+               // Default Vertical Flow
+               startX = parent.x + parentW / 2; 
+               startY = parent.y + parentH; 
+               endX = node.x + nodeW / 2; 
+               endY = node.y;
+
+               // Horizontal Flow Check (Side Connectors are typically used now)
+               // Logic: If using side handles, we connect Right of Parent to Left of Child
+               // Let's enable side-to-side drawing if connection was made via handles or if they are horizontally adjacent
+               
+               const isHorizontal = Math.abs(parent.y - node.y) < 150 || (parent.x < node.x);
+
+               if (isHorizontal) {
+                   startX = parent.x + parentW; // Right side
+                   startY = parent.y + parentH / 2; // Center Vertically
+                   endX = node.x; // Left side
+                   endY = node.y + (node.type === 'image' ? 384/2 : (node.type === 'prompt' ? (node.inputImages?.length ? 125 : 60) : 50));
+                   
+                   return (
+                     <path key={`link-${pid}-${node.id}`} d={`M ${startX} ${startY} C ${startX + 100} ${startY}, ${endX - 100} ${endY}, ${endX} ${endY}`} fill="none" stroke={theme === 'white-apple' ? '#cbd5e1' : '#52525b'} strokeWidth="2" />
+                   );
                }
 
                return (
@@ -951,6 +1377,8 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
                lang={lang} 
                theme={theme}
                isSelected={selectedNodeIds.has(node.id)}
+               isLinking={!!activeConnection && activeConnection.startNodeId !== node.id}
+               isLinkingSource={activeConnection?.startNodeId === node.id}
                onDelete={() => deleteNode(node.id)} 
                onDoubleClick={() => node.imageData && setPreviewImage(node.imageData)}
                onDownload={() => node.imageData && downloadImage(node.imageData, `nano-banana-${node.id}.png`)}
@@ -959,6 +1387,8 @@ export const Canvas: React.FC<CanvasProps> = ({ t, lang, onToggleLanguage, theme
                onRemix={() => handleRemixPrompt(node)}
                onSubmit={(content) => handleNodeSubmit(node.id, content)}
                onRegenerate={() => handleRegenerate(node)}
+               onStartConnection={(clientX, clientY, w, h) => handleStartConnection(node.id, clientX, clientY, w, h)}
+               onCompleteConnection={() => handleCompleteConnection(node.id)}
              />
           </div>
         ))}
@@ -981,6 +1411,8 @@ const NodeItem: React.FC<{
   lang: Language; 
   theme: Theme;
   isSelected?: boolean;
+  isLinking?: boolean;
+  isLinkingSource?: boolean;
   onDelete: () => void; 
   onDoubleClick?: () => void;
   onDownload?: () => void;
@@ -989,16 +1421,59 @@ const NodeItem: React.FC<{
   onRemix?: () => void;
   onSubmit?: (content: string) => void;
   onRegenerate?: () => void;
-}> = ({ node, t, lang, theme, isSelected, onDelete, onDoubleClick, onDownload, onImageClick, onEdit, onRemix, onSubmit, onRegenerate }) => {
+  onStartConnection?: (x: number, y: number, w: number, h: number) => void;
+  onCompleteConnection?: () => void;
+}> = ({ node, t, lang, theme, isSelected, isLinking, isLinkingSource, onDelete, onDoubleClick, onDownload, onImageClick, onEdit, onRemix, onSubmit, onRegenerate, onStartConnection, onCompleteConnection }) => {
   const [localContent, setLocalContent] = useState(node.content || "");
   const selectionRing = isSelected ? 'ring-2 ring-yellow-400 border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.3)]' : '';
+  const linkingRing = isLinkingSource ? 'ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : '';
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
+  const getNodeDimensions = () => {
+      const w = node.type === 'prompt' ? 450 : (node.type === 'text' ? 500 : 384);
+      const h = node.type === 'prompt' ? (node.inputImages?.length ? 250 : 120) : (node.type === 'text' ? 100 : 384);
+      return { w, h };
+  };
+
+  const handleDragStart = (e: React.PointerEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const { w, h } = getNodeDimensions();
+      onStartConnection?.(e.clientX, e.clientY, w, h);
+  };
+
+  const handleNodePointerUp = (e: React.PointerEvent) => {
+     if (isLinking) {
+         e.preventDefault();
+         e.stopPropagation();
+         onCompleteConnection?.();
+     }
+  };
+
+  const renderHandles = () => (
+      <>
+        {/* Right Handle (Output / Source) Only */}
+        <div 
+           onPointerDown={handleDragStart}
+           className={`absolute top-1/2 -right-3 -translate-y-1/2 size-6 rounded-full flex items-center justify-center z-50 transition hover:scale-125 cursor-cell border-2 ${isLinkingSource ? 'bg-yellow-500 border-white' : 'bg-panel-bg border-border-app hover:border-primary hover:bg-primary/20'}`}
+           title="Drag to Connect"
+        >
+            <div className={`size-2 rounded-full ${isLinkingSource ? 'bg-white' : 'bg-primary'}`}></div>
+        </div>
+      </>
+  );
+
   if (node.type === 'prompt') {
     return (
-      <div className="w-[450px] relative group">
-        <div className={`backdrop-blur-md border rounded-[2rem] p-6 shadow-2xl transition-all ${theme === 'white-apple' ? 'bg-white/80 border-gray-200' : 'bg-panel-bg/90 border-primary/20'} ${node.isEditing ? 'border-primary ring-1 ring-primary' : 'hover:border-primary'} ${selectionRing}`}>
+      <div 
+        className="w-[450px] relative group"
+      >
+        <div 
+            onPointerUp={handleNodePointerUp}
+            className={`backdrop-blur-md border rounded-[2rem] p-6 shadow-2xl transition-all ${theme === 'white-apple' ? 'bg-white/80 border-gray-200' : 'bg-panel-bg/90 border-primary/20'} ${node.isEditing ? 'border-primary ring-1 ring-primary' : 'hover:border-primary'} ${selectionRing} ${linkingRing} ${isLinking ? 'cursor-crosshair hover:bg-green-500/10' : ''}`}
+        >
+           {renderHandles()}
            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="size-5 rounded-full bg-teal-600 flex items-center justify-center text-[10px] text-white font-bold">A</div>
@@ -1040,8 +1515,14 @@ const NodeItem: React.FC<{
 
   if (node.type === 'text') {
     return (
-      <div className="w-[500px] relative group">
-        <div className={`backdrop-blur-md border rounded-[2rem] p-6 shadow-2xl transition-all ${theme === 'white-apple' ? 'bg-white border-blue-200 shadow-blue-500/10' : 'bg-[#1e1e24]/95 border-purple-500/20 shadow-purple-900/10'} ${selectionRing}`}>
+      <div 
+        className="w-[500px] relative group"
+      >
+        <div 
+            onPointerUp={handleNodePointerUp}
+            className={`backdrop-blur-md border rounded-[2rem] p-6 shadow-2xl transition-all ${theme === 'white-apple' ? 'bg-white border-blue-200 shadow-blue-500/10' : 'bg-[#1e1e24]/95 border-purple-500/20 shadow-purple-900/10'} ${selectionRing} ${linkingRing} ${isLinking ? 'cursor-crosshair hover:bg-indigo-500/10' : ''}`}
+        >
+           {renderHandles()}
            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className={`size-6 rounded-full flex items-center justify-center text-white font-bold shadow-lg ${node.modelType === 'standard' ? 'bg-amber-500' : 'bg-gradient-to-br from-indigo-500 to-purple-500'}`}>
@@ -1089,9 +1570,11 @@ const NodeItem: React.FC<{
   if (node.type === 'image') {
     return (
       <div 
-        className={`size-96 bg-panel-bg rounded-[2rem] border shadow-2xl overflow-hidden relative group transition-colors ${node.status === 'error' ? 'border-red-500/50' : 'border-border-app hover:border-primary/50'} ${selectionRing}`}
+        className={`size-96 bg-panel-bg rounded-[2rem] border shadow-2xl overflow-hidden relative group transition-colors ${node.status === 'error' ? 'border-red-500/50' : 'border-border-app hover:border-primary/50'} ${selectionRing} ${linkingRing} ${isLinking ? 'cursor-crosshair ring-2 ring-green-500/50' : ''}`}
+        onPointerUp={handleNodePointerUp}
         onDoubleClick={onDoubleClick}
       >
+         {renderHandles()}
          {node.status === 'loading' && (
            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
               <div className="size-12 rounded-full border-4 border-border-app border-t-primary animate-spin"></div>
